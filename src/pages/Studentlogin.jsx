@@ -323,7 +323,7 @@ const Studentlogin = () => {
                   disabled={loading}
                   className="w-full bg-gradient-to-r from-cyan-500 to-blue-900 py-3 px-6 rounded-full text-white font-semibold  shadow-lg disabled:opacity-70"
                 >
-                  {loading ? "Submitting..." : "✅ Submit Entry (+₹2 Earning)"}
+                  {loading ? "Submitting..." : "✅ Submit Entry"}
                 </button>
               </div>
             </form>
