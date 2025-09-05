@@ -22,6 +22,21 @@ const Admin = () => {
   // Scroll helper
   const scrollToSection = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth' });
 
+  // --- small helper: robust date formatting (handles ISO, ms, seconds) ---
+  const normalizeDate = (val) => {
+    if (!val && val !== 0) return '-';
+    // numbers / numeric strings → epoch
+    const n = typeof val === 'number' ? val : Number(val);
+    if (Number.isFinite(n)) {
+      const ms = n < 1e12 ? n * 1000 : n; // seconds → ms
+      const d = new Date(ms);
+      return isNaN(d.getTime()) ? String(val) : d.toLocaleString();
+    }
+    // try Date parse
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? String(val) : d.toLocaleString();
+  };
+
   // ------- USERS -------
   const loadUsers = useCallback(async () => {
     try {
@@ -73,7 +88,6 @@ const Admin = () => {
       setLoadingWithdrawals(true);
       setWithdrawalsError('');
 
-      // Use same BASE_URL (as requested)
       const url = `${BASE_URL}/withdraw/all?ngrok-skip-browser-warning=true&_=${Date.now()}`;
 
       const res = await fetch(url, {
@@ -238,24 +252,52 @@ const Admin = () => {
               {!loadingWithdrawals && withdrawals?.length === 0 && !withdrawalsError && (
                 <tr className="bg-white border-b border-gray-200">
                   <td className="px-6 py-4" colSpan={5}>
-                    {/* yahi woh text jo aap chaahte the */}
                     No withdrawal requests.
                   </td>
                 </tr>
               )}
 
-              {withdrawals?.map((req) => (
-                <tr key={req._id || req.requestId || req.id} className="bg-white border-b border-gray-200">
-                  <td className="px-6 py-4">{req.requestId || req._id || req.id || '-'}</td>
-                  <td className="px-6 py-4">{typeof req.amount === 'number' ? req.amount : (req.amount || '-')}</td>
-                  <td className="px-6 py-4">{req.status || '-'}</td>
-                  <td className="px-6 py-4">{req.requestedBy || req.user || '-'}</td>
-                  <td className="px-6 py-4">
-                    {req.date ? new Date(req.date).toLocaleString() :
-                     req.createdAt ? new Date(req.createdAt).toLocaleString() : '-'}
-                  </td>
-                </tr>
-              ))}
+              {withdrawals?.map((req) => {
+                // derive requester contact safely from common keys
+                const email =
+                  req.email ||
+                  req.userEmail ||
+                  req.contactEmail ||
+                  (req.user && (req.user.email || req.user.userEmail)) ||
+                  (req.requestedBy && (req.requestedBy.email || req.requestedBy.userEmail)) ||
+                  '-';
+
+                const phone =
+                  req.phone ||
+                  req.mobile ||
+                  req.userPhone ||
+                  (req.user && (req.user.phone || req.user.mobile || req.user.userPhone)) ||
+                  (req.requestedBy && (req.requestedBy.phone || req.requestedBy.mobile || req.requestedBy.userPhone)) ||
+                  '';
+
+                // choose best available date-like field
+                const dateRaw =
+                  req.date ||
+                  req.createdAt ||
+                  req.created_on ||
+                  req.requestedAt ||
+                  req.timestamp ||
+                  req.updatedAt ||
+                  null;
+
+                return (
+                  <tr key={req._id || req.requestId || req.id} className="bg-white border-b border-gray-200">
+                    <td className="px-6 py-4">{req.requestId || req._id || req.id || '-'}</td>
+                    <td className="px-6 py-4">{typeof req.amount === 'number' ? req.amount : (req.amount || '-')}</td>
+                    <td className="px-6 py-4">{req.status || '-'}</td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium">{email}</div>
+                      {phone ? <div className="text-xs text-gray-500">{phone}</div> : null}
+                    </td>
+                    <td className="px-6 py-4">{normalizeDate(dateRaw)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

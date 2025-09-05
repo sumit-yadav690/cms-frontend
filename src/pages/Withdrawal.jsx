@@ -1,9 +1,8 @@
-// Withdrawal.jsx
 import React, { useState } from 'react';
 
 const BASE_URL = (import.meta.env.VITE_BASE_URL || '').replace(/\/+$/, '');
 
-const Withdrawal = () => {
+const Withdrawal = ({ availableBalance = 0 }) => {
   const [name, setName] = useState('');
   const [upiId, setUpiId] = useState('');
   const [amount, setAmount] = useState(''); // keep as string for controlled input
@@ -29,10 +28,9 @@ const Withdrawal = () => {
       setLoading(true);
       const token = localStorage.getItem('authToken') || '';
 
-      // Payload must match backend keys exactly: name, UpiId, amount
       const payload = {
         name: name.trim(),
-        UpiId: upiId.trim(),
+        upiId: upiId.trim(),
         amount: numericAmount,
       };
 
@@ -86,22 +84,22 @@ const Withdrawal = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <div className="bg-white rounded-md shadow px-4 py-3 text-center">
             <p className="text-xs text-gray-500">Available balance</p>
-            <p className="text-xl font-bold">₹0</p>
+            <p className="text-xl font-bold">₹{availableBalance}</p>
           </div>
           <div className="bg-white rounded-md shadow px-4 py-3 text-center">
             <p className="text-xs text-gray-500">Withdrawal limit</p>
-            <p className="text-xl font-bold">Min ₹50</p>
+            <p className="text-xl font-bold">Min ₹100</p>
           </div>
-          <div className="bg-white rounded-md shadow px-4 py-3 text-center">
+          {/* <div className="bg-white rounded-md shadow px-4 py-3 text-center">
             <p className="text-xs text-gray-500">Last withdrawal</p>
             <p className="text-xl font-bold">Never</p>
-          </div>
+          </div> */}
         </div>
 
         {/* Rules */}
         <div className="bg-white rounded-md p-4 border">
           <ul className="text-sm list-disc pl-5 space-y-1 text-gray-600">
-            <li>Minimum withdrawal ₹50</li>
+            <li>Minimum withdrawal ₹100</li>
             <li>Requests are processed within 24–48 hours</li>
             <li>Make sure your UPI ID is correct</li>
             <li>A service fee may apply depending on the channel</li>
@@ -157,9 +155,9 @@ const Withdrawal = () => {
             </label>
             <input
               type="number"
-              min={50}
+              min={100}
               step={1}
-              placeholder="Minimum ₹50"
+              placeholder="Minimum ₹100"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required

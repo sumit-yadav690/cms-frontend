@@ -32,16 +32,17 @@ const Referal = () => {
   const [studentCount, setStudentCount] = useState(0);
   const [rewardPoints, setRewardPoints] = useState(0);
 
+  // from getAllreferral
+  const [referrals, setReferrals] = useState([]);
+  const [totalReferrals, setTotalReferrals] = useState(0);
+  const [referralsLoading, setReferralsLoading] = useState(false);
+
   // form state
   const [friendName, setFriendName] = useState('');
   const [friendEmail, setFriendEmail] = useState('');
   const [friendPhone, setFriendPhone] = useState('');
   const [sharingReferralCode, setSharingReferralCode] = useState('');
   const [sharingStatus, setSharingStatus] = useState('');
-
-  // history state
-  const [referrals, setReferrals] = useState([]);
-  const [referralsLoading, setReferralsLoading] = useState(false);
 
   // loading flags
   const [loadingCode, setLoadingCode] = useState(false);
@@ -81,11 +82,13 @@ const Referal = () => {
     localStorage.setItem('studentCount', String(sc));
     localStorage.setItem('userReward', String(rw));
     if (data?.token) localStorage.setItem('authToken', data.token);
+
+    return code;
   };
 
-  // Fallback to your old /referral/share GET if needed
+  // Fallback to your old /referral/share GET if needed (only to discover code)
   const fetchCodeFallback = async () => {
-    if (!BASE_URL) return;
+    if (!BASE_URL) return '';
     const url = `${BASE_URL}/referral/share?ngrok-skip-browser-warning=true&_=${Date.now()}`;
     const res = await fetch(url, {
       headers: {
@@ -110,60 +113,89 @@ const Referal = () => {
       setSharingReferralCode((prev) => prev || code);
       localStorage.setItem('activeReferralCode', code);
     }
+    return code;
   };
 
-  // 👇 Fetch referral history
-  const fetchReferrals = async () => {
+  // 👇 Fetch referral history by code
+  const fetchReferralsByCode = async (code) => {
+    if (!BASE_URL || !code) return;
     try {
       setReferralsLoading(true);
-      const res = await fetch(`${BASE_URL}/referral/list`, {
-        headers: {
-          Accept: 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      const arr = data?.data || data?.referrals || (Array.isArray(data) ? data : []);
-      const mapped = arr.map((r) => ({
-        name: r.friendName || r.name || '',
-        email: r.friendEmail || r.email || '',
-        phone: r.friendPhone || r.phone || '',
-        status: 'Success', // 👈 force success
-        createdAt: r.createdAt || r.date || r.updatedAt || null,
+      const res = await fetch(
+        `${BASE_URL}/referral/getAllreferral/${encodeURIComponent(code)}?ngrok-skip-browser-warning=true&_=${Date.now()}`,
+        {
+          headers: {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        }
+      );
+
+      const ctype = res.headers.get('content-type')?.toLowerCase() || '';
+      const isJson = ctype.includes('application/json');
+      const data = isJson ? await res.json() : null;
+
+      if (!res.ok) {
+        const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      // normalize list
+      const rawList =
+        (data && (data.data || data.referrals || data.list)) ||
+        (Array.isArray(data) ? data : []);
+      const mapped = (rawList || []).map((r) => ({
+        name: r.friendName || r.name || r.fullName || '',
+        email: r.friendEmail || r.email || r.contactEmail || '',
+        phone: r.friendPhone || r.phone || r.mobile || '',
+        status: r.status || r.referralStatus || 'Success',
+        createdAt: r.createdAt || r.date || r.updatedAt || r.createdOn || null,
       }));
+
       setReferrals(mapped);
-    } catch {
-      setReferrals([]); // fail → empty, no error
+
+      const total =
+        Number(
+          (data && (data.total ?? data.count)) ??
+          mapped.length
+        ) || 0;
+      setTotalReferrals(total);
+    } catch (e) {
+      setReferrals([]);
+      setTotalReferrals(0);
+      // (silent) you can surface e.message if you want
     } finally {
       setReferralsLoading(false);
     }
   };
 
-  // On mount
+  // On mount -> get code -> load referrals for that code
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         setLoadingCode(true);
-        await fetchUserFromLogin();
+        let code = await fetchUserFromLogin();
+        if (!code) {
+          try { code = await fetchCodeFallback(); } catch {}
+        }
+        if (!cancelled && code) {
+          await fetchReferralsByCode(code);
+        }
       } catch (err) {
         if (!cancelled) setLoginFetchError((err && err.message) || 'Login re-fetch failed');
-        try {
-          await fetchCodeFallback();
-        } catch {}
       } finally {
         if (!cancelled) setLoadingCode(false);
-        if (!cancelled) fetchReferrals();
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   // submit share
   const handleShareReferral = async () => {
-    const codeToUse = sharingReferralCode || referralCode;
+    const codeToUse = (sharingReferralCode || referralCode || '').trim();
     if (!friendName || !friendEmail || !friendPhone || !codeToUse) {
       setSharingStatus('Please fill all the details.');
       return;
@@ -191,14 +223,8 @@ const Referal = () => {
       setFriendName(''); setFriendEmail(''); setFriendPhone('');
       setSharingReferralCode(referralCode || codeToUse || '');
 
-      const newRec = {
-        name: friendName,
-        email: friendEmail,
-        phone: friendPhone,
-        status: 'Success', // 👈 always success
-        createdAt: new Date().toISOString(),
-      };
-      setReferrals((prev) => [newRec, ...prev]);
+      // Refresh list + total for this code (server truth)
+      await fetchReferralsByCode(codeToUse);
     } catch (error) {
       setSharingStatus(error.message || 'Something went wrong.');
     }
@@ -223,11 +249,10 @@ const Referal = () => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  // progress tiles
-  const successfulReferrals = Number(studentCount || 0);
-  const neededForNext = Math.max(0, 3 - successfulReferrals);
-  const invited = successfulReferrals;
-  const progressPct = Math.min(100, Math.round((invited / (successfulReferrals + Math.max(1, neededForNext))) * 100));
+  // tiles (use API totalReferrals instead of studentCount)
+  const successfulReferrals = Number(totalReferrals || 0);
+  const NEXT_TARGET = 3;
+  const neededForNext = Math.max(0, NEXT_TARGET - successfulReferrals);
 
   const formatDate = (iso) => {
     if (!iso) return '';
@@ -235,10 +260,18 @@ const Referal = () => {
     catch { return String(iso); }
   };
 
+  const statusClasses = (s) => {
+    const t = String(s || '').toLowerCase();
+    if (t.includes('success') || t.includes('approved')) return 'bg-emerald-100 text-emerald-700';
+    if (t.includes('pending') || t.includes('inprogress')) return 'bg-amber-100 text-amber-700';
+    if (t.includes('rejected') || t.includes('failed')) return 'bg-rose-100 text-rose-700';
+    return 'bg-slate-100 text-slate-700';
+    };
+
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center py-8 px-4">
       <div className="w-full max-w-5xl bg-white rounded-2xl shadow-lg border border-yellow-300 overflow-hidden">
-        
+
         {/* Header */}
         <div className="bg-gradient-to-r from-cyan-700 to-blue-700 text-white py-6 text-center">
           <div className="text-2xl font-extrabold">🎁 Refer & Earn Amazing Rewards!</div>
@@ -257,9 +290,6 @@ const Referal = () => {
             <StatTile title="Reward Points" value={rewardPoints} />
           </div>
           <div className="mt-6">
-            <div className="w-full bg-white rounded-full h-3 shadow-inner">
-              <div className="bg-green-500 h-3 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
-            </div>
             <p className="mt-2 text-sm text-center font-medium">Progress to Next Reward</p>
           </div>
         </div>
@@ -292,7 +322,7 @@ const Referal = () => {
               <input type="tel" placeholder="10-digit phone number" className="border p-2 rounded-lg w-full"
                 value={friendPhone} onChange={(e) => setFriendPhone(e.target.value)} />
               <input type="text" placeholder="Referral Code" className="border p-2 rounded-lg w-full md:col-span-2"
-                value={sharingReferralCode || referralCode} onChange={(e) => setSharingReferralCode(e.target.value)} />
+                value={(sharingReferralCode || referralCode)} onChange={(e) => setSharingReferralCode(e.target.value)} />
             </div>
 
             <div className="flex flex-col md:flex-row justify-center gap-4 mt-5">
@@ -324,12 +354,14 @@ const Referal = () => {
           <p className="mt-3 text-sm opacity-90">Share this code with friends when they join Placify</p>
         </div>
 
-        {/* My Referrals */}
+        {/* Referral History (by code) */}
         <div className="p-6">
-          <h2 className="font-bold text-lg mb-3 flex items-center gap-2">👥 My Referrals</h2>
+          <h2 className="font-bold text-lg mb-3 flex items-center gap-2">👥 Referral History</h2>
           {referralsLoading && <div className="text-center text-sm text-gray-600">Loading…</div>}
           {!referralsLoading && referrals.length === 0 && (
-            <p className="text-center text-gray-500">No referral history.</p>
+            <p className="text-center text-gray-500">
+              {`No referral history for code ${referralCode || sharingReferralCode || '—'}.`}
+            </p>
           )}
           <div className="space-y-3">
             {referrals.map((r, idx) => (
@@ -342,7 +374,7 @@ const Referal = () => {
                   </div>
                   <div className="text-xs text-gray-500 mt-1">{formatDate(r.createdAt)}</div>
                 </div>
-                <Pill className="bg-emerald-100 text-emerald-700">Success</Pill>
+                <Pill className={statusClasses(r.status)}>{r.status || '—'}</Pill>
               </div>
             ))}
           </div>

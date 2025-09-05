@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 const BASE_URL = (import.meta.env.VITE_BASE_URL || "").replace(/\/+$/, "");
 
-const Navbar = ({ onReferralClick, onWithdrawalClick }) => {
+const Navbar = ({ onReferralClick, onWithdrawalClick, refreshKey = 0, onEarningsChange }) => {
   const navigate = useNavigate();
 
   const name = localStorage.getItem("displayName") || "User";
@@ -67,16 +67,26 @@ const Navbar = ({ onReferralClick, onWithdrawalClick }) => {
 
         setTotalEntries(Number.isFinite(tEntries) ? tEntries : 0);
         setTodayEntries(Number.isFinite(dEntries) ? dEntries : 0);
-        setTotalEarnings(Number.isFinite(earnings) ? earnings : 0);
+        const normalizedEarnings = Number.isFinite(earnings) ? earnings : 0;
+        setTotalEarnings(normalizedEarnings);
+
+        // 🔁 tell parent (Studentlogin) so Withdrawal can show balance
+        if (typeof onEarningsChange === "function") {
+          onEarningsChange(normalizedEarnings);
+        }
       } catch (e) {
-        if (e.name !== "AbortError") setErr(e.message || "Failed to load stats");
+        if (e.name !== "AbortError") {
+          setErr(e.message || "Failed to load stats");
+          // on error, still inform parent with 0 so UI stays consistent
+          if (typeof onEarningsChange === "function") onEarningsChange(0);
+        }
       } finally {
         setLoading(false);
       }
     })();
 
     return () => ctrl.abort();
-  }, [studentId, token]);
+  }, [studentId, token, refreshKey, onEarningsChange]); // 👈 refreshKey change → refetch stats
 
   const handleLogout = () => {
     localStorage.removeItem("displayName");
@@ -85,7 +95,7 @@ const Navbar = ({ onReferralClick, onWithdrawalClick }) => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("studentId");
     localStorage.removeItem("userId");
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });  // 👈
   };
 
   return (

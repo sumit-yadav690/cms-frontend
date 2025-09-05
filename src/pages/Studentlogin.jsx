@@ -14,6 +14,12 @@ const Studentlogin = () => {
   const referralRef = useRef(null);
   const withdrawalRef = useRef(null);
 
+  // 🔁 navbar stats refresh trigger
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+
+  // ✅ available balance (Navbar → parent → Withdrawal)
+  const [availableBalance, setAvailableBalance] = useState(0);
+
   // BACKEND FIELDS:
   // studentName, dob(YYYY-MM-DD), gender, phone, email, city, state,
   // courseApplied, admissionYear(number), college
@@ -76,16 +82,15 @@ const Studentlogin = () => {
       };
 
       const res = await fetch(`${BASE_URL}/user/addstudent?ngrok-skip-browser-warning=true`, {
-  method: "POST",
-  headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  },
-  body: JSON.stringify(payload),
-  cache: "no-store",
-});
-
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      });
 
       const ctype = res.headers.get("content-type")?.toLowerCase() || "";
       if (!ctype.includes("application/json")) {
@@ -102,6 +107,9 @@ const Studentlogin = () => {
         studentId: data?.student?.studentId,
         reward: data?.reward,
       });
+
+      // 🔁 trigger navbar stats refresh right away
+      setStatsRefreshKey((k) => k + 1);
 
       // Reset form (keep email/phone if you prefer)
       setFormData({
@@ -137,7 +145,12 @@ const Studentlogin = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
-      <Navbar onReferralClick={toggleReferral} onWithdrawalClick={toggleWithdrawal} />
+      <Navbar
+        onReferralClick={toggleReferral}
+        onWithdrawalClick={toggleWithdrawal}
+        refreshKey={statsRefreshKey}  // 👈 important
+        onEarningsChange={setAvailableBalance} // 👈 NEW: Navbar से earnings parent को
+      />
 
       <main className="flex-1">
         {/* Student Form Section */}
@@ -171,7 +184,9 @@ const Studentlogin = () => {
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Student Name *</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Student Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="studentName"
@@ -186,7 +201,9 @@ const Studentlogin = () => {
               {/* Row: DOB + Gender */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Date of Birth *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     name="dob"
@@ -197,7 +214,9 @@ const Studentlogin = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Gender *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Gender <span className="text-red-500">*</span>
+                  </label>
                   <select
                     name="gender"
                     value={formData.gender}
@@ -218,7 +237,9 @@ const Studentlogin = () => {
               {/* Row: Phone + Email */}
               <div className="grid grid-cols-1 md-grid-cols-2 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Phone *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Phone <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="tel"
                     name="phone"
@@ -232,7 +253,9 @@ const Studentlogin = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Email *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Email <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="email"
                     name="email"
@@ -248,7 +271,9 @@ const Studentlogin = () => {
               {/* Row: City + State */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">City *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    City <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="city"
@@ -260,7 +285,9 @@ const Studentlogin = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">State *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    State <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="state"
@@ -276,7 +303,9 @@ const Studentlogin = () => {
               {/* Row: Course + Admission Year */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Course Applied *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Course Applied <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="courseApplied"
@@ -288,7 +317,9 @@ const Studentlogin = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Admission Year *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Admission Year <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     name="admissionYear"
@@ -305,7 +336,9 @@ const Studentlogin = () => {
 
               {/* College */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">College *</label>
+                <label className="block text-sm font-medium text-gray-700">
+                  College <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="college"
@@ -323,7 +356,7 @@ const Studentlogin = () => {
                   disabled={loading}
                   className="w-full bg-gradient-to-r from-cyan-500 to-blue-900 py-3 px-6 rounded-full text-white font-semibold  shadow-lg disabled:opacity-70"
                 >
-                  {loading ? "Submitting..." : "✅ Submit Entry"}
+                  {loading ? "Submitting..." : " Submit Entry"}
                 </button>
               </div>
             </form>
@@ -333,7 +366,7 @@ const Studentlogin = () => {
         {/* Conditional Sections */}
         <div className="px-4">
           <div ref={referralRef}>{showReferral && <Referal />}</div>
-          <div ref={withdrawalRef}>{showWithdrawal && <Withdrawal />}</div>
+          <div ref={withdrawalRef}>{showWithdrawal && <Withdrawal availableBalance={availableBalance} />}</div>
         </div>
       </main>
 

@@ -60,7 +60,7 @@ const Login = () => {
       if (typeof data?.user?.reward !== "undefined") localStorage.setItem("userReward", String(data.user.reward));
 
       // Admin shortcut (aapke sample ke hisaab se)
-      const adminCredentials = { email: "admin@placify-connect.com", phone: "placify@321" };
+      const adminCredentials = { email: "admin@placify-connect.com", phone: "9087654321" };
       if (email === adminCredentials.email && phone === adminCredentials.phone) {
         navigate("/admin");
       } else {
