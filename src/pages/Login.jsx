@@ -59,7 +59,7 @@ const Login = () => {
       if (typeof data?.user?.studentCount !== "undefined") localStorage.setItem("studentCount", String(data.user.studentCount));
       if (typeof data?.user?.reward !== "undefined") localStorage.setItem("userReward", String(data.user.reward));
 
-      // Admin shortcut (aapke sample ke hisaab se)
+      // Admin shortcut
       const adminCredentials = { email: "admin@placify-connect.com", phone: "9087654321" };
       if (email === adminCredentials.email && phone === adminCredentials.phone) {
         navigate("/admin");
@@ -73,10 +73,13 @@ const Login = () => {
     }
   };
 
+  // ✅ PUBLIC folder image with BASE_URL (works even on subpath deploys)
+  const bgUrl = `${import.meta.env.BASE_URL}login-bg.png`; // make sure file exists at: public/login-bg.png
+
   return (
     <div
       className="h-screen flex items-center justify-center bg-cover bg-center"
-      style={{ backgroundImage: "url('../src/assets/login-bg.png')" }}
+      style={{ backgroundImage: `url(${bgUrl})` }}
     >
       <div className="bg-white/90 p-8 rounded-lg shadow-lg max-w-sm w-full">
         <div className="bg-blue-500 text-white text-center py-2 rounded-t-lg -mt-8 -mx-8 mb-6">
